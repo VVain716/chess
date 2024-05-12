@@ -1,3 +1,5 @@
+import copy
+
 import pygame
 import pieces
 
@@ -39,9 +41,8 @@ def draw_board(board):
                 draw_piece(board[i][j])
 
 
-def show_legal_moves(board, piece_clicked):
-    y, x = piece_clicked
-    legal_moves = board[x][y].get_legal_moves(board)
+
+def show_legal_moves(legal_moves):
     for legal_move in legal_moves:
         rect = pygame.rect.Rect(legal_move[1] * BLOCKSIZE, legal_move[0] * BLOCKSIZE, BLOCKSIZE, BLOCKSIZE)
         pygame.draw.rect(screen, (LIGHT_YELLOW if (legal_move[0] + legal_move[1]) % 2 == 0 else DARK_YELLOW), rect)
@@ -61,7 +62,8 @@ def main():
                 pos = pygame.mouse.get_pos()
                 x, y = pos[0] // BLOCKSIZE, pos[1] // BLOCKSIZE
                 if legal_moves and (y, x) in legal_moves:
-                    board_class.board = pieces.make_move(board_class.board, (x, y), (piece_clicked[1], piece_clicked[0]))
+                    board_class.board = pieces.make_move(board_class.board, (x, y),
+                                                         (piece_clicked[1], piece_clicked[0]))
                     piece_clicked = None
                     legal_moves = None
                     if white_player:
@@ -72,18 +74,27 @@ def main():
                     piece_clicked = x, y
                     legal_moves = board_class.board[piece_clicked[1]][piece_clicked[0]].get_legal_moves(
                         board_class.board)
+                    moves_to_remove = []
+                    for move in legal_moves:
+                        if not pieces.is_check_resolved(board_class.board, (move[1], move[0]),
+                                                        (piece_clicked[1], piece_clicked[0]),
+                                                        is_white=white_player):
+                            moves_to_remove.append(move)
+
+                    for move in moves_to_remove:
+                        legal_moves.remove(move)
 
         screen.fill('black')
         draw_grid()
         if piece_clicked:
-            clicked_rect = pygame.rect.Rect(piece_clicked[0] * BLOCKSIZE, piece_clicked[1]*BLOCKSIZE, BLOCKSIZE,
+            clicked_rect = pygame.rect.Rect(piece_clicked[0] * BLOCKSIZE, piece_clicked[1] * BLOCKSIZE, BLOCKSIZE,
                                             BLOCKSIZE)
             if (piece_clicked[0] + piece_clicked[1]) % 2 == 0:
                 color = LIGHT_YELLOW
             else:
                 color = DARK_YELLOW
             pygame.draw.rect(screen, color, clicked_rect)
-            show_legal_moves(board_class.board, piece_clicked)
+            show_legal_moves(legal_moves)
         white_king_pos = pieces.get_king_position(board_class.board)
         black_king_pos = pieces.get_king_position(board_class.board, False)
         white_king_in_check = pieces.in_check(board_class.board, white_king_pos[0], white_king_pos[1], True)

@@ -3,34 +3,47 @@ import copy
 pygame.init()
 
 
+def promote_pawn(board, x, y, is_white):
+    board[x][y] = Queen(x, y, is_white)
+
+    return board
+
+
 def make_move(board: list[list], future_pos: tuple, curr_pos: tuple):
     new_board = [row[:] for row in board]  # Shallow copy of the board
 
     x, y = future_pos
     b, a = curr_pos
-
     # Create a new instance of the piece at the future position
     new_board[y][x] = type(board[b][a])(x, y, board[b][a].white)
 
     # Set the position of the new piece
     new_board[y][x].x = y
     new_board[y][x].y = x
-
     # Remove the piece from its current position
     new_board[b][a] = None
-
+    if isinstance(new_board[y][x], Pawn) and (y == 0 or y == 7):
+        # Perform pawn promotion
+        new_board = promote_pawn(new_board, y, x, new_board[y][x].white)
     return new_board
 
 
 def is_check_resolved(board: list[list], future_pos: tuple, curr_pos: tuple, is_white: bool) -> bool:
     # Make a copy of the board
     new_board = make_move(board, future_pos, curr_pos)
-
     # Get the position of the king
     king_x, king_y = get_king_position(new_board, is_white)
-
+    print(king_x, king_y)
     # Check if the king is still in check
+    print(in_check(new_board, king_x, king_y, is_white))
     return not in_check(new_board, king_x, king_y, is_white)
+
+
+def print_board(board: list[list]):
+    for row in board:
+        for item in row:
+            print(type(item), end=' ')
+        print()
 
 
 def get_king_position(board: list[list], is_white=True):
@@ -45,11 +58,10 @@ def in_check(board, king_x, king_y, is_white):
         for j in range(8):
             piece = board[i][j]
             if piece and piece.white != is_white and type(piece) is not King:
-                if type(piece) is Pawn:
-                    legal_moves = piece.get_legal_moves(board, check_king=True)
-                else:
-                    legal_moves = piece.get_legal_moves(board)
+                legal_moves = piece.get_legal_moves(board)
                 if (king_x, king_y) in legal_moves:
+                    if board[2][5]:
+                        print(legal_moves)
                     return True
 
     return False
@@ -86,7 +98,7 @@ class Pawn:
         else:
             self.img = pygame.transform.smoothscale(pygame.image.load('pieces-basic-png/black-pawn.png'), (80, 80))
 
-    def get_legal_moves(self, board, check_king=False):
+    def get_legal_moves(self, board):
         legal_moves = []
         if self.white:
             white_king = get_king_position(board)
@@ -94,18 +106,18 @@ class Pawn:
                 legal_moves.append((self.x - 1, self.y))
             if self.x == 6 and board[self.x - 2][self.y] is None and board[self.x - 1][self.y] is None:
                 legal_moves.append((self.x - 2, self.y))
-            if check_king or self.x > 0 and self.y > 0 and board[self.x - 1][self.y - 1] is not None and board[self.x - 1][self.y - 1].white != self.white:
+            if self.x > 0 and self.y > 0 and board[self.x - 1][self.y - 1] is not None and board[self.x - 1][self.y - 1].white != self.white:
                 legal_moves.append((self.x - 1, self.y - 1))
-            if check_king or self.x > 0 and self.y < 7 and board[self.x - 1][self.y + 1] is not None and board[self.x - 1][self.y + 1].white != self.white:
+            if self.x > 0 and self.y < 7 and board[self.x - 1][self.y + 1] is not None and board[self.x - 1][self.y + 1].white != self.white:
                 legal_moves.append((self.x - 1, self.y + 1))
         else:
             if self.x < 7 and board[self.x + 1][self.y] is None:
                 legal_moves.append((self.x + 1, self.y))
             if self.x == 1 and board[self.x + 2][self.y] is None and board[self.x + 1][self.y] is None:
                 legal_moves.append((self.x + 2, self.y))
-            if check_king or self.x < 7 and self.y > 0 and board[self.x + 1][self.y - 1] is not None and board[self.x + 1][self.y - 1].white != self.white:
+            if self.x < 7 and self.y > 0 and board[self.x + 1][self.y - 1] is not None and board[self.x + 1][self.y - 1].white != self.white:
                 legal_moves.append((self.x + 1, self.y - 1))
-            if check_king or self.x < 7 and self.y < 7 and board[self.x + 1][self.y + 1] is not None and board[self.x + 1][self.y + 1].white != self.white:
+            if self.x < 7 and self.y < 7 and board[self.x + 1][self.y + 1] is not None and board[self.x + 1][self.y + 1].white != self.white:
                 legal_moves.append((self.x + 1, self.y + 1))
 
         return legal_moves
@@ -165,6 +177,8 @@ class Queen:
             self.img = pygame.transform.smoothscale(pygame.image.load('pieces-basic-png/black-queen.png'), (80, 80))
 
     def get_legal_moves(self, board):
+        if board[2][5]:
+            print(board[2][5])
         legal_moves = []
         # Horizontal movement
         for i in range(self.x - 1, -1, -1):
@@ -244,11 +258,9 @@ class King:
                     continue
                 if 0 <= self.x + i < 8 and 0 <= self.y + j < 8:
                     if board[self.x + i][self.y + j] is None or board[self.x + i][self.y + j].white != self.white:
-                        tmp = board[self.x][self.y]
-                        board[self.x][self.y] = None
-                        if not in_check(board, self.x + i, self.y + j, self.white):
+                        tmp_board = make_move(board, (self.x + i, self.y + j), (self.x, self.y))
+                        if not in_check(tmp_board, self.x + i, self.y + j, self.white):
                             legal_moves.append((self.x + i, self.y + j))
-                        board[self.x][self.y] = tmp
         return legal_moves
 
 
@@ -350,3 +362,16 @@ class Board:
             [Rook(7, 0, True), Knight(7, 1, True), Bishop(7, 2, True), Queen(7, 3, True), King(7, 4, True),
              Bishop(7, 5, True), Knight(7, 6, True), Rook(7, 7, True)]
         ]
+
+    def __deepcopy__(self, memo):
+        new_instance = self.__class__()
+        new_instance.board = []
+        for row in self.board:
+            new_row = []
+            for piece in row:
+                if piece is None:
+                    new_row.append(None)
+                else:
+                    new_row.append(copy.deepcopy(piece, memo))
+            new_instance.board.append(new_row)
+        return new_instance
