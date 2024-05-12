@@ -1,7 +1,11 @@
-import copy
-
+from flask import Flask, request
 import pygame
+import threading
 import pieces
+import sys
+from werkzeug.serving import make_server
+
+app = Flask(__name__)
 
 EMPTY = None
 SCREEN_WIDTH = 640
@@ -16,6 +20,14 @@ DARK_YELLOW = ((255 * 2 + 171) // 3, (218 * 2 + 136) // 3, (112 * 2 + 102) // 3)
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+
+@app.route('/send_text', methods=['POST'])
+def receive_text():
+    text = request.form['text']
+    print("Received Text:", text)
+    # Process the text as needed
+    return 'Text received successfully!'
 
 
 def draw_piece(piece):
@@ -47,7 +59,7 @@ def show_legal_moves(legal_moves):
         pygame.draw.rect(screen, (LIGHT_YELLOW if (legal_move[0] + legal_move[1]) % 2 == 0 else DARK_YELLOW), rect)
 
 
-def main():
+def main(server):
     white_player = True
     board_class = pieces.Board()
     piece_clicked = None
@@ -55,8 +67,10 @@ def main():
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
+                running = False
+                pygame.quit()  # Cleanly quit Pygame
+                server.shutdown()   # Call the function to stop the Flask server
+                sys.exit(0)  # Exit the Python interpreter
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
                 x, y = pos[0] // BLOCKSIZE, pos[1] // BLOCKSIZE
@@ -115,8 +129,12 @@ def main():
         pygame.time.Clock().tick(60)
 
 
-if __name__ == '__main__':
-    main()
+def run_flask():
+    server = make_server('0.0.0.0', 4444, app)
+    flask_thread = threading.Thread(target=server.serve_forever)
+    flask_thread.start()
+    main(server)
+
 
 if __name__ == '__main__':
-    main()
+    run_flask()
